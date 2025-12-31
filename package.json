@@ -1,0 +1,54 @@
+{
+  "name": "ar-event-alert-engine",
+  "version": "1.0.0",
+  "description": "Accounts Receivable Event & Alert Engine with Event Sourcing",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "nodemon --watch src --exec ts-node src/index.ts",
+    "worker:alert": "node dist/workers/alert-processor.js",
+    "worker:date-checker": "node dist/workers/date-checker.js",
+    "dev:worker:alert": "nodemon --watch src --exec ts-node src/workers/alert-processor.ts",
+    "dev:worker:date-checker": "nodemon --watch src --exec ts-node src/workers/date-checker.ts",
+    "docker:build": "docker-compose -f docker/docker-compose.yml build",
+    "docker:up": "docker-compose -f docker/docker-compose.yml up -d",
+    "docker:down": "docker-compose -f docker/docker-compose.yml down",
+    "docker:logs": "docker-compose -f docker/docker-compose.yml logs -f"
+  },
+  "keywords": [
+    "accounts-receivable",
+    "event-sourcing",
+    "alert-engine",
+    "telegram",
+    "mongodb"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.2",
+    "chokidar": "^3.5.3",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "mongodb": "^6.3.0",
+    "node-cron": "^3.0.3",
+    "node-telegram-bot-api": "^0.63.0",
+    "openai": "^4.20.1",
+    "uuid": "^9.0.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.5",
+    "@types/node-cron": "^3.0.11",
+    "@types/node-telegram-bot-api": "^0.64.0",
+    "@types/uuid": "^9.0.7",
+    "@types/xlsx": "^0.0.36",
+    "nodemon": "^3.0.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
