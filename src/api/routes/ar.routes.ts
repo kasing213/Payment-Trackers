@@ -7,8 +7,10 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { CreateARCommand } from '../../application/commands/create-ar.command';
 import { LogFollowUpCommand } from '../../application/commands/log-follow-up.command';
 import { VerifyPaymentCommand } from '../../application/commands/verify-payment.command';
+import { ChangeDueDateCommand } from '../../application/commands/change-due-date.command';
 import { GetARStateQuery } from '../../application/queries/get-ar-state.query';
 import { validateRequired, validateDateFields } from '../middleware/validation';
+import { ActorType } from '../../domain/events/types';
 
 /**
  * Create AR Router
@@ -17,6 +19,7 @@ export function createARRouter(
   createARCommand: CreateARCommand,
   logFollowUpCommand: LogFollowUpCommand,
   verifyPaymentCommand: VerifyPaymentCommand,
+  changeDueDateCommand: ChangeDueDateCommand,
   getARStateQuery: GetARStateQuery
 ): Router {
   const router = Router();
@@ -118,6 +121,34 @@ export function createARRouter(
           ...req.body,
         });
         res.json({ message: 'Payment verified successfully' });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  /**
+   * POST /api/ar/:ar_id/change-due-date
+   * Change the due date of an AR (for Excel import updates)
+   */
+  router.post(
+    '/:ar_id/change-due-date',
+    validateRequired(['new_due_date']),
+    validateDateFields(['new_due_date']),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const { ar_id } = req.params;
+        const { new_due_date, reason } = req.body;
+
+        await changeDueDateCommand.execute({
+          ar_id,
+          new_due_date: new Date(new_due_date),
+          reason: reason || 'Due date updated via API',
+          actor_user_id: 'API_CLIENT',
+          actor_type: ActorType.SYSTEM
+        });
+
+        res.json({ success: true, ar_id, message: 'Due date changed successfully' });
       } catch (error) {
         next(error);
       }

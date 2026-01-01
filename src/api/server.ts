@@ -6,7 +6,9 @@
 import express, { Application } from 'express';
 import { createARRouter } from './routes/ar.routes';
 import { createAlertsRouter } from './routes/alerts.routes';
+import { createExcelImportsRouter } from './routes/excel-imports.routes';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
+import { apiKeyAuth } from './middleware/auth';
 
 /**
  * Dependencies for server
@@ -15,8 +17,10 @@ export interface ServerDependencies {
   createARCommand: any;
   logFollowUpCommand: any;
   verifyPaymentCommand: any;
+  changeDueDateCommand: any;
   getARStateQuery: any;
   getPendingAlertsQuery: any;
+  excelImportLogRepository: any;
 }
 
 /**
@@ -35,7 +39,7 @@ export function createServer(dependencies: ServerDependencies): Application {
     next();
   });
 
-  // Health check endpoint
+  // Health check endpoint (no auth required)
   app.get('/health', (_req, res) => {
     res.json({
       status: 'healthy',
@@ -44,13 +48,17 @@ export function createServer(dependencies: ServerDependencies): Application {
     });
   });
 
-  // API Routes
+  // Apply authentication to all /api/* routes
+  app.use('/api', apiKeyAuth);
+
+  // API Routes (all protected by auth middleware)
   app.use(
     '/api/ar',
     createARRouter(
       dependencies.createARCommand,
       dependencies.logFollowUpCommand,
       dependencies.verifyPaymentCommand,
+      dependencies.changeDueDateCommand,
       dependencies.getARStateQuery
     )
   );
@@ -58,6 +66,11 @@ export function createServer(dependencies: ServerDependencies): Application {
   app.use(
     '/api/alerts',
     createAlertsRouter(dependencies.getPendingAlertsQuery)
+  );
+
+  app.use(
+    '/api/excel-imports',
+    createExcelImportsRouter(dependencies.excelImportLogRepository)
   );
 
   // 404 handler

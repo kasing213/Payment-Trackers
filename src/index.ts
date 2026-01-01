@@ -21,10 +21,11 @@ import { GetPendingAlertsQuery } from './application/queries/get-pending-alerts.
 import { createServer } from './api/server';
 import { AlertProcessorWorker } from './workers/alert-processor';
 import { DateCheckerWorker } from './workers/date-checker';
-import { ExcelProcessorWorker } from './workers/excel-processor';
-import { ExcelParserService } from './domain/services/excel-parser.service';
-import { GPTProcessingService } from './domain/services/gpt-processing.service';
-import { DuplicateDetectionService } from './domain/services/duplicate-detection.service';
+// Excel processing moved to local processor - Railway only hosts API
+// import { ExcelProcessorWorker } from './workers/excel-processor';
+// import { ExcelParserService } from './domain/services/excel-parser.service';
+// import { GPTProcessingService } from './domain/services/gpt-processing.service';
+// import { DuplicateDetectionService } from './domain/services/duplicate-detection.service';
 import { ExcelImportLogRepository } from './infrastructure/database/excel-import-log-repository.impl';
 
 /**
@@ -35,7 +36,7 @@ class Application {
   private server: any;
   private alertWorker: AlertProcessorWorker | null = null;
   private dateCheckerWorker: DateCheckerWorker | null = null;
-  private excelWorker: ExcelProcessorWorker | null = null;
+  // excelWorker removed - Excel processing now handled by local standalone processor
 
   async start(): Promise<void> {
     console.log('='.repeat(60));
@@ -90,14 +91,20 @@ class Application {
       const getARStateQuery = new GetARStateQuery(arRepository);
       const getPendingAlertsQuery = new GetPendingAlertsQuery(alertRepository);
 
+      // Initialize Excel import log repository (for API only, not for processing)
+      const excelImportLogRepository = new ExcelImportLogRepository(db);
+      await excelImportLogRepository.createIndexes();
+
       // Create Express server
       console.log('Creating HTTP server...');
       const app = createServer({
         createARCommand,
         logFollowUpCommand,
         verifyPaymentCommand,
+        changeDueDateCommand,
         getARStateQuery,
         getPendingAlertsQuery,
+        excelImportLogRepository,
       });
 
       // Start HTTP server
@@ -128,29 +135,8 @@ class Application {
       );
       this.dateCheckerWorker.start(config.dateCheckerCron);
 
-      // Excel processor worker
-      console.log('Initializing Excel processor worker...');
-      const excelImportLogRepository = new ExcelImportLogRepository(db);
-      await excelImportLogRepository.createIndexes();
-
-      const excelParserService = new ExcelParserService();
-      const gptProcessingService = new GPTProcessingService(config.openaiApiKey, config.openaiModel);
-      const duplicateDetectionService = new DuplicateDetectionService(arRepository);
-
-      this.excelWorker = new ExcelProcessorWorker(
-        config.excelUploadFolder,
-        config.excelProcessingFolder,
-        config.excelProcessedFolder,
-        config.excelFailedFolder,
-        config.excelBatchSize,
-        excelParserService,
-        gptProcessingService,
-        duplicateDetectionService,
-        createARCommand,
-        changeDueDateCommand,
-        excelImportLogRepository
-      );
-      await this.excelWorker.start();
+      // Excel processing moved to local standalone processor
+      // Railway deployment only hosts API endpoints for Excel import logs
 
       console.log('='.repeat(60));
       console.log('AR Event & Alert Engine - RUNNING');
@@ -172,9 +158,7 @@ class Application {
     if (this.dateCheckerWorker) {
       this.dateCheckerWorker.stop();
     }
-    if (this.excelWorker) {
-      await this.excelWorker.stop();
-    }
+    // Excel worker removed - runs in separate local process
 
     // Close HTTP server
     if (this.server) {

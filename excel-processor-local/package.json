@@ -1,0 +1,41 @@
+{
+  "name": "excel-processor-local",
+  "version": "1.0.0",
+  "description": "Local Excel processor for Payment Tracker AR system - processes Excel files and syncs to Railway API",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "watch": "nodemon --watch src --ext ts --exec ts-node src/index.ts",
+    "clean": "rimraf dist"
+  },
+  "keywords": [
+    "excel",
+    "ar-tracking",
+    "payment-tracker",
+    "railway-api"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.6.2",
+    "chokidar": "^3.5.3",
+    "dotenv": "^16.3.1",
+    "openai": "^4.20.1",
+    "uuid": "^9.0.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "@types/uuid": "^9.0.7",
+    "@types/xlsx": "^0.0.36",
+    "nodemon": "^3.0.2",
+    "rimraf": "^5.0.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

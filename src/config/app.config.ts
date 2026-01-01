@@ -31,16 +31,11 @@ export interface AppConfig {
   dateCheckerCron: string;
   prealertDays: number;
 
-  // OpenAI
-  openaiApiKey: string;
-  openaiModel: string;
+  // API Authentication (Railway deployment)
+  apiKey: string;
 
-  // Excel Processing
-  excelUploadFolder: string;
-  excelProcessingFolder: string;
-  excelProcessedFolder: string;
-  excelFailedFolder: string;
-  excelBatchSize: number;
+  // OpenAI and Excel processing moved to local processor
+  // Railway deployment only hosts API endpoints
 }
 
 /**
@@ -67,16 +62,8 @@ export function loadConfig(): AppConfig {
     dateCheckerCron: process.env.DATE_CHECKER_CRON || '0 9 * * *', // 9 AM daily
     prealertDays: parseInt(process.env.PREALERT_DAYS || '3', 10),
 
-    // OpenAI
-    openaiApiKey: process.env.OPENAI_API_KEY || '',
-    openaiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-
-    // Excel Processing
-    excelUploadFolder: process.env.EXCEL_UPLOAD_FOLDER || 'd:/Payment-Tracker/uploads/excel',
-    excelProcessingFolder: process.env.EXCEL_PROCESSING_FOLDER || 'd:/Payment-Tracker/uploads/processing',
-    excelProcessedFolder: process.env.EXCEL_PROCESSED_FOLDER || 'd:/Payment-Tracker/uploads/processed',
-    excelFailedFolder: process.env.EXCEL_FAILED_FOLDER || 'd:/Payment-Tracker/uploads/failed',
-    excelBatchSize: parseInt(process.env.EXCEL_BATCH_SIZE || '10', 10),
+    // API Authentication
+    apiKey: process.env.API_KEY || '',
   };
 
   // Validate required fields
@@ -99,17 +86,15 @@ function validateConfig(config: AppConfig): void {
     console.warn('WARNING: TELEGRAM_BOT_TOKEN is not set - alert delivery will fail');
   }
 
-  if (!config.openaiApiKey) {
-    console.warn('WARNING: OPENAI_API_KEY is not set - Excel processing will fail');
+  if (!config.apiKey) {
+    errors.push('API_KEY is required for API authentication');
   }
 
   if (config.port < 1 || config.port > 65535) {
     errors.push('PORT must be between 1 and 65535');
   }
 
-  if (config.excelBatchSize < 1 || config.excelBatchSize > 50) {
-    errors.push('EXCEL_BATCH_SIZE must be between 1 and 50');
-  }
+  // OpenAI and Excel validation removed - handled by local processor
 
   if (errors.length > 0) {
     throw new Error(
