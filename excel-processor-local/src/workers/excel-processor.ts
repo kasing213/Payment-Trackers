@@ -160,6 +160,19 @@ export class ExcelProcessorWorker {
             continue;
           }
 
+          // Validate amount before sending to Railway API
+          if (!row.amount || row.amount.value <= 0) {
+            importLog.failed_rows++;
+            importLog.errors.push({
+              row_index: row.row_index,
+              error_type: 'VALIDATION_ERROR',
+              error_message: `Amount must be greater than 0 (got: ${row.amount?.value || 0})`,
+              raw_data: row
+            });
+            console.warn(`[Excel Processor] Row ${row.row_index}: Invalid amount (${row.amount?.value || 0}), skipping`);
+            continue;
+          }
+
           // Check for duplicates
           const existing = await this.duplicateDetectionService.detectDuplicate(row);
 

@@ -44,41 +44,54 @@ export class ExcelParserService {
         raw: false  // Format values as strings
       }) as any[][];
 
-      // Skip the first row (assumed to be headers) and extract data
+      // Skip the first 2 rows (title row and headers) and extract data
       const rows: ExcelRowData[] = [];
 
-      for (let i = 1; i < jsonData.length; i++) {
+      for (let i = 2; i < jsonData.length; i++) {
         const row = jsonData[i];
 
         // Skip empty rows
-        if (!row || row.length === 0 || !row[0]) {
+        if (!row || row.length === 0 || !row[1]) {
           continue;
         }
 
-        // Extract data from columns
-        // Assuming structure: [Customer Name, Amount, Invoice Date, Due Date, Notes]
-        const customer_name = String(row[0] || '').trim();
-        const amount_raw = String(row[1] || '').trim();
-        const invoice_date_raw = String(row[2] || '').trim();
-        const due_date_raw = String(row[3] || '').trim();
-        const notes = String(row[4] || '').trim();
+        // Extract data from columns based on actual Excel structure:
+        // A (index 0): Order number
+        // B (index 1): Customer ID
+        // C (index 2): Customer Name
+        // D (index 3): Phone 1
+        // E (index 4): Phone 2
+        // F (index 5): Payment Date
+        // G (index 6): Amount
+        // H (index 7): Notes/Status
+        const customer_code = String(row[1] || '').trim();      // Column B: Customer ID
+        const customer_name = String(row[2] || '').trim();      // Column C: Customer Name
+        const phone_1 = String(row[3] || '').trim();            // Column D: Phone 1
+        const phone_2 = String(row[4] || '').trim();            // Column E: Phone 2
+        const payment_date_raw = String(row[5] || '').trim();   // Column F: Payment Date
+        const amount_raw = String(row[6] || '').trim();         // Column G: Amount
+        const notes = String(row[7] || '').trim();              // Column H: Notes
 
         // Skip rows without minimum required data
         if (!customer_name || !amount_raw) {
           continue;
         }
 
+        // Combine phone numbers
+        const phone = [phone_1, phone_2].filter(p => p).join(' / ');
+
         rows.push({
           row_index: i + 1, // 1-indexed row number
           customer_name,
           amount_raw,
-          date_raw: invoice_date_raw || due_date_raw, // Fallback to due_date if invoice_date missing
+          date_raw: payment_date_raw,
           notes: notes || undefined,
           raw_data: {
+            customer_code,
             customer_name,
-            amount_raw,
-            invoice_date_raw,
-            due_date_raw,
+            phone,
+            due_date: payment_date_raw,
+            amount: amount_raw,
             notes
           }
         });

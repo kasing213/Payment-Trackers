@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { ExcelRowData, NormalizedRowData, GPTProcessingResponse } from '../models/excel-import';
+import { ExcelRowData, NormalizedRowData } from '../models/excel-import';
 
 /**
  * GPT Processing Service
@@ -64,7 +64,14 @@ export class GPTProcessingService {
    */
   private async callGPT(rows: ExcelRowData[]): Promise<string> {
     const systemPrompt = this.getSystemPrompt();
-    const userPrompt = JSON.stringify({ rows }, null, 2);
+
+    // Format input according to excel-to-json.md documentation
+    const formattedRows = rows.map(row => ({
+      row_index: row.row_index,
+      data: row.raw_data
+    }));
+
+    const userPrompt = JSON.stringify(formattedRows, null, 2);
 
     const completion = await this.openai.chat.completions.create({
       model: this.model,
@@ -89,31 +96,42 @@ export class GPTProcessingService {
    */
   private parseGPTResponse(response: string): NormalizedRowData[] {
     try {
-      // Extract JSON from response (in case GPT includes markdown code blocks)
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      // Extract JSON array from response (in case GPT includes markdown code blocks)
+      const jsonMatch = response.match(/\[[\s\S]*\]/);
       if (!jsonMatch) {
-        throw new Error('No JSON found in GPT response');
+        throw new Error('No JSON array found in GPT response');
       }
 
-      const parsed: GPTProcessingResponse = JSON.parse(jsonMatch[0]);
+      const parsed = JSON.parse(jsonMatch[0]);
 
-      if (!parsed.normalized_rows || !Array.isArray(parsed.normalized_rows)) {
-        throw new Error('Invalid GPT response structure');
+      if (!Array.isArray(parsed)) {
+        throw new Error('GPT response is not an array');
       }
 
-      // Convert GPT response to NormalizedRowData
-      return parsed.normalized_rows.map(row => ({
-        row_index: row.row_index,
-        customer_id: row.customer_id,
-        customer_name: row.customer_name,
-        amount: row.amount,
-        invoice_date: new Date(row.invoice_date),
-        due_date: new Date(row.due_date),
-        notes: row.notes,
-        validation_status: row.validation_status,
-        warnings: row.warnings || [],
-        errors: row.errors || []
-      }));
+      // Transform GPT output format to NormalizedRowData format
+      return parsed.map(item => {
+        const customer_id = item.customer?.customer_ref || this.generateCustomerId(item.customer?.name || '');
+        const customer_name = item.customer?.name || '';
+        const amount = {
+          value: item.ar?.amount || 0,
+          currency: item.ar?.currency || 'USD'
+        };
+        const due_date_str = item.ar?.due_date;
+        const due_date = due_date_str ? new Date(due_date_str) : new Date();
+
+        return {
+          row_index: item.row_index,
+          customer_id,
+          customer_name,
+          amount,
+          invoice_date: due_date, // Use same date for invoice and due date for now
+          due_date,
+          notes: item.notes || undefined,
+          validation_status: item.validation_status || 'VALID',
+          warnings: item.warnings || [],
+          errors: item.errors || []
+        };
+      });
 
     } catch (error: any) {
       throw new Error(`Failed to parse GPT response: ${error.message}`);
@@ -122,75 +140,65 @@ export class GPTProcessingService {
 
   /**
    * Get the system prompt for GPT-4o-mini
+   * Based on excel-to-json.md documentation
    */
   private getSystemPrompt(): string {
-    return `You are a data normalization assistant for an Accounts Receivable system.
+    return `You are an Excel → JSON translator. You convert messy Excel row data into clean JSON.
 
-INPUT: Excel row data with potentially messy formats
-OUTPUT: Structured JSON with validated, normalized data
+STRICT RULES:
+- Output JSON only (no explanations)
+- Preserve Khmer text exactly
+- Convert dates to YYYY-MM-DD format
+- Remove currency symbols from amounts ($ or ៛)
+- Convert amounts to numbers
+- Split phone numbers into arrays
+- If value is missing → use null
+- Do NOT invent missing data
+- Do NOT make business decisions
+- Detect currency from symbols: $ = USD, ៛ = KHR, default = USD
 
-CRITICAL RULES:
-1. Output JSON only (no explanations)
-2. Don't invent missing required data
-3. Preserve Khmer text exactly as provided
-4. Normalize dates to YYYY-MM-DD format
-5. Convert amounts to numbers (remove commas, currency symbols)
-6. Extract currency from context ($ = USD, ៛ = KHR, default = USD)
-7. Generate customer_id if missing: CUST_<sanitized_name_uppercase>
-8. If invoice date is missing, use current month start date
-9. If due date is missing, use invoice date + 30 days
+You are a translator, not a judge.
 
-OUTPUT SCHEMA:
-{
-  "normalized_rows": [{
+INPUT FORMAT (array of objects):
+[
+  {
     "row_index": number,
-    "customer_id": "string",
-    "customer_name": "string (exact from input)",
-    "amount": { "value": number, "currency": "USD|KHR" },
-    "invoice_date": "YYYY-MM-DD",
-    "due_date": "YYYY-MM-DD",
-    "notes": "string",
+    "data": {
+      "customer_code": "string",
+      "customer_name": "string",
+      "phone": "phone1 / phone2",
+      "due_date": "date string",
+      "amount": "amount with currency",
+      "notes": "string"
+    }
+  }
+]
+
+OUTPUT FORMAT (array of objects):
+[
+  {
+    "row_index": number,
+    "customer": {
+      "customer_ref": "customer_code from input",
+      "name": "customer_name (preserve Khmer exactly)",
+      "phones": ["phone1", "phone2"]
+    },
+    "ar": {
+      "amount": number (without currency symbols),
+      "currency": "USD|KHR",
+      "due_date": "YYYY-MM-DD"
+    },
+    "notes": "string or null",
     "validation_status": "VALID|WARNING|ERROR",
     "warnings": ["array of warnings"],
     "errors": ["array of errors"]
-  }],
-  "errors": []
-}
+  }
+]
 
 EXAMPLES:
-Input: { "customer_name": "សូ ពិសី", "amount_raw": "150,000 KHR", "date_raw": "31/12/2025" }
-Output: {
-  "normalized_rows": [{
-    "row_index": 1,
-    "customer_id": "CUST_SO_PISI",
-    "customer_name": "សូ ពិសី",
-    "amount": { "value": 150000, "currency": "KHR" },
-    "invoice_date": "2025-12-01",
-    "due_date": "2025-12-31",
-    "notes": "",
-    "validation_status": "VALID",
-    "warnings": [],
-    "errors": []
-  }],
-  "errors": []
-}
+Input: [{"row_index": 4, "data": {"customer_code": "B101", "customer_name": "សុក ពិសី", "phone": "010 683020 / 069 705019", "due_date": "12/30/2025", "amount": "$136.00", "notes": "បង់គ្រប់"}}]
 
-Input: { "customer_name": "Acme Corp", "amount_raw": "$5,000", "date_raw": "01/01/2025" }
-Output: {
-  "normalized_rows": [{
-    "row_index": 1,
-    "customer_id": "CUST_ACME_CORP",
-    "customer_name": "Acme Corp",
-    "amount": { "value": 5000, "currency": "USD" },
-    "invoice_date": "2025-01-01",
-    "due_date": "2025-01-31",
-    "notes": "",
-    "validation_status": "VALID",
-    "warnings": [],
-    "errors": []
-  }],
-  "errors": []
-}`;
+Output: [{"row_index": 4, "customer": {"customer_ref": "B101", "name": "សុក ពិសី", "phones": ["010683020", "069705019"]}, "ar": {"amount": 136, "currency": "USD", "due_date": "2025-12-30"}, "notes": "បង់គ្រប់", "validation_status": "VALID", "warnings": [], "errors": []}]`;
   }
 
   /**
