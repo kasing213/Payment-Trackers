@@ -52,7 +52,7 @@ export function createExcelImportsRouter(
    * GET /api/excel-imports
    * Get recent import logs (last 100)
    */
-  router.get('/', async (req: Request, res: Response, next: NextFunction) => {
+  router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const logs = await excelImportLogRepository.findRecent(100);
       res.json({ count: logs.length, logs });
