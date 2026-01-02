@@ -17,7 +17,8 @@ export interface ExcelRowData {
 // Normalized data (after GPT processing)
 export interface NormalizedRowData {
   row_index: number;
-  customer_id: string;
+  home_id: string;           // House/meter ID (e.g., "B101")
+  zone?: string;             // Zone/area (e.g., "Sros")
   customer_name: string;
   amount: { value: number; currency: string };
   invoice_date: Date;
@@ -56,7 +57,8 @@ export interface GPTProcessingRequest {
 export interface GPTProcessingResponse {
   normalized_rows: Array<{
     row_index: number;
-    customer_id: string;
+    home_id: string;           // House/meter ID (e.g., "B101")
+    zone?: string;             // Zone/area (e.g., "Sros")
     customer_name: string;
     amount: { value: number; currency: string };
     invoice_date: string;  // YYYY-MM-DD format

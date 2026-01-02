@@ -15,8 +15,9 @@ import { Money } from '../../domain/models/ar';
  * Create AR Data Transfer Object
  */
 export interface CreateARDTO {
-  customer_id: string;
-  customer_name: string;
+  home_id: string;           // House/meter ID (e.g., "B101")
+  zone: string;              // Area/route (e.g., "Sros")
+  customer_name: string;     // Person living there
   amount: Money;
   invoice_date: Date;
   due_date: Date;
@@ -60,7 +61,8 @@ export class CreateARCommand {
         version: 1,
       },
       payload: {
-        customer_id: dto.customer_id,
+        home_id: dto.home_id,
+        zone: dto.zone,
         customer_name: dto.customer_name,
         amount: dto.amount,
         invoice_date: dto.invoice_date,
@@ -89,8 +91,12 @@ export class CreateARCommand {
    * Validate input data
    */
   private validateInput(dto: CreateARDTO): void {
-    if (!dto.customer_id || dto.customer_id.trim() === '') {
-      throw new Error('customer_id is required');
+    if (!dto.home_id || dto.home_id.trim() === '') {
+      throw new Error('home_id is required');
+    }
+
+    if (!dto.zone || dto.zone.trim() === '') {
+      throw new Error('zone is required');
     }
 
     if (!dto.customer_name || dto.customer_name.trim() === '') {

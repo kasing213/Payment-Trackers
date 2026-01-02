@@ -13,34 +13,34 @@ export class DuplicateDetectionService {
   /**
    * Detect if a normalized row matches an existing AR
    *
-   * Match criteria: customer_id + invoice_date (same customer, same invoice period)
+   * Match criteria: home_id + invoice_date (same home, same invoice period)
    *
    * @param row - Normalized row data from Excel
    * @returns Existing AR if duplicate found, null if new
    */
   async detectDuplicate(row: NormalizedRowData): Promise<ARState | null> {
-    // Find ARs for this customer
-    const customerARs = await this.arRepository.findByCustomerId(row.customer_id);
+    // Find ARs for this home
+    const homeARs = await this.arRepository.findByHomeId(row.home_id);
 
-    if (customerARs.length === 0) {
-      return null; // No existing ARs for this customer
+    if (homeARs.length === 0) {
+      return null; // No existing ARs for this home
     }
 
     // Check for exact match by invoice_date
     // Match if invoice dates are within the same month
     const rowInvoiceMonth = this.getYearMonth(row.invoice_date);
 
-    for (const ar of customerARs) {
+    for (const ar of homeARs) {
       const arInvoiceMonth = this.getYearMonth(ar.invoice_date);
 
       if (rowInvoiceMonth === arInvoiceMonth) {
-        // Found a match: same customer + same invoice month
+        // Found a match: same home + same invoice month
         return ar;
       }
     }
 
     // Fuzzy matching: check if amount + date within 7 days
-    for (const ar of customerARs) {
+    for (const ar of homeARs) {
       const daysDiff = Math.abs(
         (row.invoice_date.getTime() - ar.invoice_date.getTime()) / (1000 * 60 * 60 * 24)
       );
@@ -52,7 +52,7 @@ export class DuplicateDetectionService {
       ) {
         // Fuzzy match: same amount + date within 7 days
         console.warn(
-          `Fuzzy match detected for customer ${row.customer_id}: ` +
+          `Fuzzy match detected for home ${row.home_id}: ` +
           `AR ${ar.ar_id} (${ar.invoice_date}) vs Excel row ${row.row_index} (${row.invoice_date})`
         );
         return ar;

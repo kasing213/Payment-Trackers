@@ -4,7 +4,8 @@ import { RailwayAPIService } from './railway-api.service';
 // Simplified ARState interface for local processor
 interface ARState {
   ar_id: string;
-  customer_id: string;
+  home_id: string;        // House/meter ID (e.g., "B101")
+  zone: string;           // Zone/area (e.g., "Sros")
   customer_name: string;
   amount: { value: number; currency: string };
   invoice_date: Date;
@@ -22,34 +23,34 @@ export class DuplicateDetectionService {
   /**
    * Detect if a normalized row matches an existing AR
    *
-   * Match criteria: customer_id + invoice_date (same customer, same invoice period)
+   * Match criteria: home_id + invoice_date (same home, same invoice period)
    *
    * @param row - Normalized row data from Excel
    * @returns Existing AR if duplicate found, null if new
    */
   async detectDuplicate(row: NormalizedRowData): Promise<ARState | null> {
-    // Find ARs for this customer via Railway API
-    const customerARs = await this.railwayApi.getARsByCustomer(row.customer_id);
+    // Find ARs for this home via Railway API
+    const homeARs = await this.railwayApi.getARsByHome(row.customer_id);  // customer_id field contains home_id
 
-    if (customerARs.length === 0) {
-      return null; // No existing ARs for this customer
+    if (homeARs.length === 0) {
+      return null; // No existing ARs for this home
     }
 
     // Check for exact match by invoice_date
     // Match if invoice dates are within the same month
     const rowInvoiceMonth = this.getYearMonth(row.invoice_date);
 
-    for (const ar of customerARs) {
+    for (const ar of homeARs) {
       const arInvoiceMonth = this.getYearMonth(ar.invoice_date);
 
       if (rowInvoiceMonth === arInvoiceMonth) {
-        // Found a match: same customer + same invoice month
+        // Found a match: same home + same invoice month
         return ar;
       }
     }
 
     // Fuzzy matching: check if amount + date within 7 days
-    for (const ar of customerARs) {
+    for (const ar of homeARs) {
       const daysDiff = Math.abs(
         (row.invoice_date.getTime() - ar.invoice_date.getTime()) / (1000 * 60 * 60 * 24)
       );
@@ -61,7 +62,7 @@ export class DuplicateDetectionService {
       ) {
         // Fuzzy match: same amount + date within 7 days
         console.warn(
-          `Fuzzy match detected for customer ${row.customer_id}: ` +
+          `Fuzzy match detected for home ${row.customer_id}: ` +
           `AR ${ar.ar_id} (${ar.invoice_date}) vs Excel row ${row.row_index} (${row.invoice_date})`
         );
         return ar;

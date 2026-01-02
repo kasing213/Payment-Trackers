@@ -13,8 +13,9 @@ import { Money, ARStatus } from '../models/ar';
 export interface ARCreatedEvent extends BaseEvent {
   event_type: EventType.AR_CREATED;
   payload: {
-    customer_id: string;
-    customer_name: string;
+    home_id: string;           // House/meter ID (e.g., "B101")
+    zone: string;              // Area/route (e.g., "Sros")
+    customer_name: string;     // Person living there
     amount: Money;
     invoice_date: Date;
     due_date: Date;

@@ -26,6 +26,16 @@ export interface LocalConfig {
   excelProcessedFolder: string;
   excelFailedFolder: string;
   excelBatchSize: number;
+
+  // Multi-sheet Processing
+  sheetsMode: 'all' | 'first' | 'allowlist' | 'denylist';
+  sheetsAllowlist: string[];
+  sheetsDenylist: string[];
+  maxSheetsPerFile: number;
+
+  // Header Detection
+  headerScanRows: number;
+  minRequiredHeaders: number;
 }
 
 /**
@@ -47,6 +57,16 @@ export function loadConfig(): LocalConfig {
     excelProcessedFolder: process.env.EXCEL_PROCESSED_FOLDER || 'd:/Payment-Tracker/uploads/processed',
     excelFailedFolder: process.env.EXCEL_FAILED_FOLDER || 'd:/Payment-Tracker/uploads/failed',
     excelBatchSize: parseInt(process.env.EXCEL_BATCH_SIZE || '10', 10),
+
+    // Multi-sheet Processing
+    sheetsMode: (process.env.SHEETS_MODE as 'all' | 'first' | 'allowlist' | 'denylist') || 'all',
+    sheetsAllowlist: process.env.SHEETS_ALLOWLIST?.split(',').map(s => s.trim()).filter(s => s) || [],
+    sheetsDenylist: process.env.SHEETS_DENYLIST?.split(',').map(s => s.trim()).filter(s => s) || [],
+    maxSheetsPerFile: parseInt(process.env.MAX_SHEETS_PER_FILE || '20', 10),
+
+    // Header Detection
+    headerScanRows: parseInt(process.env.HEADER_SCAN_ROWS || '25', 10),
+    minRequiredHeaders: parseInt(process.env.MIN_REQUIRED_HEADERS || '3', 10),
   };
 
   // Validate required fields
@@ -75,6 +95,22 @@ function validateConfig(config: LocalConfig): void {
 
   if (config.excelBatchSize < 1 || config.excelBatchSize > 50) {
     errors.push('EXCEL_BATCH_SIZE must be between 1 and 50');
+  }
+
+  if (!['all', 'first', 'allowlist', 'denylist'].includes(config.sheetsMode)) {
+    errors.push('SHEETS_MODE must be one of: all, first, allowlist, denylist');
+  }
+
+  if (config.maxSheetsPerFile < 1 || config.maxSheetsPerFile > 100) {
+    errors.push('MAX_SHEETS_PER_FILE must be between 1 and 100');
+  }
+
+  if (config.headerScanRows < 1 || config.headerScanRows > 100) {
+    errors.push('HEADER_SCAN_ROWS must be between 1 and 100');
+  }
+
+  if (config.minRequiredHeaders < 1 || config.minRequiredHeaders > 10) {
+    errors.push('MIN_REQUIRED_HEADERS must be between 1 and 10');
   }
 
   if (errors.length > 0) {

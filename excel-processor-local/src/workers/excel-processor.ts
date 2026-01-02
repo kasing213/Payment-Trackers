@@ -130,9 +130,35 @@ export class ExcelProcessorWorker {
       console.log(`[Excel Processor] Moved to processing: ${fileName}`);
 
       // Parse Excel file
-      const rawRows = await this.excelParserService.parseFile(processingPath);
+      const rawRows = await this.excelParserService.parseFile(processingPath, fileName);
       importLog.total_rows = rawRows.length;
       console.log(`[Excel Processor] Parsed ${rawRows.length} rows from ${fileName}`);
+
+      // Build per-sheet stats
+      const sheetStatsMap = new Map<string, {
+        rows: typeof rawRows;
+        header_row_index: number;
+      }>();
+
+      for (const row of rawRows) {
+        if (!sheetStatsMap.has(row.sheet_name)) {
+          sheetStatsMap.set(row.sheet_name, {
+            rows: [],
+            header_row_index: row.source.header_row_index || 0
+          });
+        }
+        sheetStatsMap.get(row.sheet_name)!.rows.push(row);
+      }
+
+      importLog.sheets_processed = Array.from(sheetStatsMap.entries()).map(([sheet_name, data]) => ({
+        sheet_name,
+        rows_found: data.rows.length,
+        rows_successful: 0,  // Will increment during processing
+        rows_failed: 0,      // Will increment during processing
+        header_row_index: data.header_row_index
+      }));
+
+      console.log(`[Excel Processor] Sheets processed: ${Array.from(sheetStatsMap.keys()).join(', ')}`);
 
       // Process rows in batches with GPT
       const normalizedRows: NormalizedRowData[] = [];
@@ -152,11 +178,19 @@ export class ExcelProcessorWorker {
           if (row.validation_status === 'ERROR') {
             importLog.failed_rows++;
             importLog.errors.push({
+              sheet_name: row.sheet_name,  // NEW: Track sheet
               row_index: row.row_index,
               error_type: 'VALIDATION_ERROR',
               error_message: row.errors.join(', '),
               raw_data: row
             });
+
+            // Update per-sheet stats
+            if (importLog.sheets_processed && row.sheet_name) {
+              const sheetStat = importLog.sheets_processed.find(s => s.sheet_name === row.sheet_name);
+              if (sheetStat) sheetStat.rows_failed++;
+            }
+
             continue;
           }
 
@@ -164,11 +198,19 @@ export class ExcelProcessorWorker {
           if (!row.amount || row.amount.value <= 0) {
             importLog.failed_rows++;
             importLog.errors.push({
+              sheet_name: row.sheet_name,  // NEW: Track sheet
               row_index: row.row_index,
               error_type: 'VALIDATION_ERROR',
               error_message: `Amount must be greater than 0 (got: ${row.amount?.value || 0})`,
               raw_data: row
             });
+
+            // Update per-sheet stats
+            if (importLog.sheets_processed && row.sheet_name) {
+              const sheetStat = importLog.sheets_processed.find(s => s.sheet_name === row.sheet_name);
+              if (sheetStat) sheetStat.rows_failed++;
+            }
+
             console.warn(`[Excel Processor] Row ${row.row_index}: Invalid amount (${row.amount?.value || 0}), skipping`);
             continue;
           }
@@ -179,7 +221,8 @@ export class ExcelProcessorWorker {
           if (!existing) {
             // New AR - create it via Railway API
             const result = await this.railwayApi.createAR({
-              customer_id: row.customer_id,
+              home_id: row.customer_id,    // Rename: customer_id contains home ID (e.g., "B101")
+              zone: row.sheet_name || 'UNKNOWN',  // Zone from sheet name (e.g., "Sros")
               customer_name: row.customer_name,
               amount: row.amount,
               invoice_date: row.invoice_date,
@@ -187,6 +230,13 @@ export class ExcelProcessorWorker {
             });
 
             importLog.successful_rows++;
+
+            // Update per-sheet stats
+            if (importLog.sheets_processed && row.sheet_name) {
+              const sheetStat = importLog.sheets_processed.find(s => s.sheet_name === row.sheet_name);
+              if (sheetStat) sheetStat.rows_successful++;
+            }
+
             console.log(`[Excel Processor] Row ${row.row_index}: New AR created for ${row.customer_name} (AR ID: ${result.ar_id})`);
 
           } else {
@@ -228,11 +278,19 @@ export class ExcelProcessorWorker {
         } catch (error: any) {
           importLog.failed_rows++;
           importLog.errors.push({
+            sheet_name: row.sheet_name,  // NEW: Track sheet
             row_index: row.row_index,
             error_type: 'PROCESSING_ERROR',
             error_message: error.message,
             raw_data: row
           });
+
+          // Update per-sheet stats
+          if (importLog.sheets_processed && row.sheet_name) {
+            const sheetStat = importLog.sheets_processed.find(s => s.sheet_name === row.sheet_name);
+            if (sheetStat) sheetStat.rows_failed++;
+          }
+
           console.error(`[Excel Processor] Error processing row ${row.row_index}:`, error.message);
         }
       }

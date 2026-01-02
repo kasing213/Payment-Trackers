@@ -48,7 +48,8 @@ export class EventReplayService {
   private static initializeFromCreatedEvent(event: ARCreatedEvent): ARState {
     return {
       ar_id: event.ar_id,
-      customer_id: event.payload.customer_id,
+      home_id: event.payload.home_id,
+      zone: event.payload.zone,
       customer_name: event.payload.customer_name,
       amount: event.payload.amount,
       current_status: ARStatus.PENDING, // Initial status

@@ -28,12 +28,20 @@ export interface IARRepository {
   findById(ar_id: string): Promise<ARState | null>;
 
   /**
-   * Find ARs by customer ID
+   * Find ARs by home ID
    *
-   * @param customer_id - Customer identifier
+   * @param home_id - Home/meter identifier (e.g., "B101")
    * @returns Array of AR states
    */
-  findByCustomerId(customer_id: string): Promise<ARState[]>;
+  findByHomeId(home_id: string): Promise<ARState[]>;
+
+  /**
+   * Find ARs by zone
+   *
+   * @param zone - Zone/area identifier (e.g., "Sros")
+   * @returns Array of AR states
+   */
+  findByZone(zone: string): Promise<ARState[]>;
 
   /**
    * Find ARs by status

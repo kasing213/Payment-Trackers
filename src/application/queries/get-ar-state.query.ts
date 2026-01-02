@@ -27,17 +27,31 @@ export class GetARStateQuery {
   }
 
   /**
-   * Execute query to get all ARs for a customer
+   * Execute query to get all ARs for a home
    *
-   * @param customer_id - Customer identifier
+   * @param home_id - Home/meter identifier (e.g., "B101")
    * @returns Array of AR states
    */
-  async executeByCustomer(customer_id: string): Promise<ARState[]> {
-    if (!customer_id || customer_id.trim() === '') {
-      throw new Error('customer_id is required');
+  async executeByHome(home_id: string): Promise<ARState[]> {
+    if (!home_id || home_id.trim() === '') {
+      throw new Error('home_id is required');
     }
 
-    return await this.arRepository.findByCustomerId(customer_id);
+    return await this.arRepository.findByHomeId(home_id);
+  }
+
+  /**
+   * Execute query to get all ARs for a zone
+   *
+   * @param zone - Zone/area identifier (e.g., "Sros")
+   * @returns Array of AR states
+   */
+  async executeByZone(zone: string): Promise<ARState[]> {
+    if (!zone || zone.trim() === '') {
+      throw new Error('zone is required');
+    }
+
+    return await this.arRepository.findByZone(zone);
   }
 
   /**

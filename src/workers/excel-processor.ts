@@ -171,7 +171,8 @@ export class ExcelProcessorWorker {
           if (!existing) {
             // New AR - create it
             await this.createARCommand.execute({
-              customer_id: row.customer_id,
+              home_id: row.home_id,
+              zone: row.zone || 'UNKNOWN',
               customer_name: row.customer_name,
               amount: row.amount,
               invoice_date: row.invoice_date,

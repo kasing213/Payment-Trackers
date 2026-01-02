@@ -45,7 +45,8 @@ export class GPTProcessingService {
         // Return rows with error status
         return rows.map(row => ({
           row_index: row.row_index,
-          customer_id: this.generateCustomerId(row.customer_name),
+          home_id: this.generateHomeId(row.customer_name),
+          zone: undefined,
           customer_name: row.customer_name,
           amount: { value: 0, currency: 'USD' },
           invoice_date: new Date(),
@@ -104,7 +105,8 @@ export class GPTProcessingService {
       // Convert GPT response to NormalizedRowData
       return parsed.normalized_rows.map(row => ({
         row_index: row.row_index,
-        customer_id: row.customer_id,
+        home_id: row.home_id,
+        zone: row.zone,
         customer_name: row.customer_name,
         amount: row.amount,
         invoice_date: new Date(row.invoice_date),
@@ -136,7 +138,7 @@ CRITICAL RULES:
 4. Normalize dates to YYYY-MM-DD format
 5. Convert amounts to numbers (remove commas, currency symbols)
 6. Extract currency from context ($ = USD, ៛ = KHR, default = USD)
-7. Generate customer_id if missing: CUST_<sanitized_name_uppercase>
+7. Generate home_id if missing: HOME_<sanitized_name_uppercase>
 8. If invoice date is missing, use current month start date
 9. If due date is missing, use invoice date + 30 days
 
@@ -144,7 +146,8 @@ OUTPUT SCHEMA:
 {
   "normalized_rows": [{
     "row_index": number,
-    "customer_id": "string",
+    "home_id": "string (house/meter ID)",
+    "zone": "string (optional area/route)",
     "customer_name": "string (exact from input)",
     "amount": { "value": number, "currency": "USD|KHR" },
     "invoice_date": "YYYY-MM-DD",
@@ -162,7 +165,8 @@ Input: { "customer_name": "សូ ពិសី", "amount_raw": "150,000 KHR", "d
 Output: {
   "normalized_rows": [{
     "row_index": 1,
-    "customer_id": "CUST_SO_PISI",
+    "home_id": "HOME_SO_PISI",
+    "zone": null,
     "customer_name": "សូ ពិសី",
     "amount": { "value": 150000, "currency": "KHR" },
     "invoice_date": "2025-12-01",
@@ -179,7 +183,8 @@ Input: { "customer_name": "Acme Corp", "amount_raw": "$5,000", "date_raw": "01/0
 Output: {
   "normalized_rows": [{
     "row_index": 1,
-    "customer_id": "CUST_ACME_CORP",
+    "home_id": "HOME_ACME_CORP",
+    "zone": null,
     "customer_name": "Acme Corp",
     "amount": { "value": 5000, "currency": "USD" },
     "invoice_date": "2025-01-01",
@@ -194,16 +199,16 @@ Output: {
   }
 
   /**
-   * Generate customer ID from customer name
+   * Generate home ID from customer name (fallback only)
    */
-  private generateCustomerId(name: string): string {
+  private generateHomeId(name: string): string {
     // Sanitize name: remove special chars, convert to uppercase
     const sanitized = name
       .replace(/[^a-zA-Z0-9\s]/g, '')
       .replace(/\s+/g, '_')
       .toUpperCase();
 
-    return `CUST_${sanitized}`;
+    return `HOME_${sanitized}`;
   }
 
   /**

@@ -30,7 +30,7 @@ export function createARRouter(
    */
   router.post(
     '/',
-    validateRequired(['customer_id', 'customer_name', 'amount', 'invoice_date', 'due_date']),
+    validateRequired(['home_id', 'zone', 'customer_name', 'amount', 'invoice_date', 'due_date']),
     validateDateFields(['invoice_date', 'due_date']),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
@@ -60,12 +60,25 @@ export function createARRouter(
   });
 
   /**
-   * GET /api/ar/customer/:customer_id
-   * Get all ARs for a customer
+   * GET /api/ar/home/:home_id
+   * Get all ARs for a home
    */
-  router.get('/customer/:customer_id', async (req: Request, res: Response, next: NextFunction) => {
+  router.get('/home/:home_id', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const ars = await getARStateQuery.executeByCustomer(req.params.customer_id);
+      const ars = await getARStateQuery.executeByHome(req.params.home_id);
+      res.json({ count: ars.length, ars });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  /**
+   * GET /api/ar/zone/:zone
+   * Get all ARs for a zone
+   */
+  router.get('/zone/:zone', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const ars = await getARStateQuery.executeByZone(req.params.zone);
       res.json({ count: ars.length, ars });
     } catch (error) {
       next(error);

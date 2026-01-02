@@ -29,8 +29,9 @@ export interface Money {
 export interface ARState {
   // Identity
   ar_id: string;
-  customer_id: string;   // Source of truth for identity
-  customer_name: string;
+  home_id: string;       // House/meter ID (e.g., "B101") - the billable entity
+  zone: string;          // Area/route (e.g., "Sros") - current zone assignment
+  customer_name: string; // Person living there (can change)
 
   // Financial data
   amount: Money;

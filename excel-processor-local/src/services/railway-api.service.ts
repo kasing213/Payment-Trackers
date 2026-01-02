@@ -33,17 +33,18 @@ export class RailwayAPIService {
    * @returns Created AR ID
    */
   async createAR(data: {
-    customer_id: string;
+    home_id: string;           // House/meter ID (e.g., "B101")
+    zone: string;              // Zone/area (e.g., "Sros")
     customer_name: string;
     amount: { value: number; currency: string };
     invoice_date: Date;
     due_date: Date;
   }): Promise<{ ar_id: string }> {
     const response = await this.client.post('/api/ar', {
-      customer_id: data.customer_id,
+      home_id: data.home_id,
+      zone: data.zone,
       customer_name: data.customer_name,
-      amount: data.amount.value,
-      currency: data.amount.currency,
+      amount: data.amount,
       invoice_date: data.invoice_date.toISOString(),
       due_date: data.due_date.toISOString()
     });
@@ -75,12 +76,12 @@ export class RailwayAPIService {
   }
 
   /**
-   * Get ARs by customer ID (for duplicate detection)
-   * @param customer_id - Customer ID to search
+   * Get ARs by home ID (for duplicate detection)
+   * @param home_id - Home/meter ID to search (e.g., "B101")
    * @returns Array of AR states
    */
-  async getARsByCustomer(customer_id: string): Promise<any[]> {
-    const response = await this.client.get(`/api/ar/customer/${customer_id}`);
+  async getARsByHome(home_id: string): Promise<any[]> {
+    const response = await this.client.get(`/api/ar/home/${home_id}`);
     return response.data.ars || [];
   }
 

@@ -63,10 +63,18 @@ export class MongoARRepository implements IARRepository {
   }
 
   /**
-   * Find ARs by customer ID
+   * Find ARs by home ID
    */
-  async findByCustomerId(customer_id: string): Promise<ARState[]> {
-    const docs = await this.collection.find({ customer_id }).toArray();
+  async findByHomeId(home_id: string): Promise<ARState[]> {
+    const docs = await this.collection.find({ home_id }).toArray();
+    return docs.map(this.mapDocumentToARState);
+  }
+
+  /**
+   * Find ARs by zone
+   */
+  async findByZone(zone: string): Promise<ARState[]> {
+    const docs = await this.collection.find({ zone }).toArray();
     return docs.map(this.mapDocumentToARState);
   }
 
@@ -155,7 +163,8 @@ export class MongoARRepository implements IARRepository {
   private mapDocumentToARState(doc: any): ARState {
     return {
       ar_id: doc.ar_id,
-      customer_id: doc.customer_id,
+      home_id: doc.home_id,
+      zone: doc.zone,
       customer_name: doc.customer_name,
       amount: doc.amount,
       current_status: doc.current_status,
