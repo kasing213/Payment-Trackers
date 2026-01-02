@@ -26,9 +26,22 @@ export class GPTProcessingService {
       return [];
     }
 
+    // Create mapping of row_index to sheet_name BEFORE GPT processing
+    // This preserves metadata that GPT doesn't need to process
+    const sheetNameMap = new Map<number, string>();
+    rows.forEach(row => {
+      sheetNameMap.set(row.row_index, row.sheet_name);
+    });
+
     try {
       const response = await this.callGPT(rows);
-      return this.parseGPTResponse(response);
+      const normalized = this.parseGPTResponse(response);
+
+      // Map sheet_name back to normalized rows using row_index
+      return normalized.map(row => ({
+        ...row,
+        sheet_name: sheetNameMap.get(row.row_index)
+      }));
 
     } catch (error: any) {
       // Retry logic with exponential backoff
@@ -37,7 +50,13 @@ export class GPTProcessingService {
 
       try {
         const response = await this.callGPT(rows);
-        return this.parseGPTResponse(response);
+        const normalized = this.parseGPTResponse(response);
+
+        // Map sheet_name back (retry path)
+        return normalized.map(row => ({
+          ...row,
+          sheet_name: sheetNameMap.get(row.row_index)
+        }));
 
       } catch (retryError: any) {
         console.error('GPT API retry failed:', retryError.message);
@@ -45,6 +64,7 @@ export class GPTProcessingService {
         // Return rows with error status
         return rows.map(row => ({
           row_index: row.row_index,
+          sheet_name: row.sheet_name,  // Preserve sheet_name in error path
           customer_id: this.generateCustomerId(row.customer_name),
           customer_name: row.customer_name,
           amount: { value: 0, currency: 'USD' },
