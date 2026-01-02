@@ -38,10 +38,18 @@ export class GPTProcessingService {
       const normalized = this.parseGPTResponse(response);
 
       // Map sheet_name back to normalized rows using row_index
-      return normalized.map(row => ({
-        ...row,
-        sheet_name: sheetNameMap.get(row.row_index)
-      }));
+      // Add 1 month to due_date (monthly billing cycle)
+      return normalized.map(row => {
+        const adjustedDueDate = new Date(row.due_date);
+        adjustedDueDate.setMonth(adjustedDueDate.getMonth() + 1);
+
+        return {
+          ...row,
+          sheet_name: sheetNameMap.get(row.row_index),
+          due_date: adjustedDueDate,
+          invoice_date: new Date()  // Set to current date
+        };
+      });
 
     } catch (error: any) {
       // Retry logic with exponential backoff
@@ -53,10 +61,18 @@ export class GPTProcessingService {
         const normalized = this.parseGPTResponse(response);
 
         // Map sheet_name back (retry path)
-        return normalized.map(row => ({
-          ...row,
-          sheet_name: sheetNameMap.get(row.row_index)
-        }));
+        // Add 1 month to due_date (monthly billing cycle)
+        return normalized.map(row => {
+          const adjustedDueDate = new Date(row.due_date);
+          adjustedDueDate.setMonth(adjustedDueDate.getMonth() + 1);
+
+          return {
+            ...row,
+            sheet_name: sheetNameMap.get(row.row_index),
+            due_date: adjustedDueDate,
+            invoice_date: new Date()  // Set to current date
+          };
+        });
 
       } catch (retryError: any) {
         console.error('GPT API retry failed:', retryError.message);

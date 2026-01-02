@@ -8,6 +8,8 @@ import { IARRepository } from '../domain/repositories/ar-repository.interface';
 import { AlertService } from '../domain/services/alert-service';
 import { ARStatus } from '../domain/models/ar';
 import { AlertType, TargetType } from '../domain/models/alert';
+import { ChangeARStatusCommand } from '../application/commands/change-ar-status.command';
+import { ActorType } from '../domain/events/types';
 
 /**
  * Date Checker Worker Configuration
@@ -27,6 +29,7 @@ export class DateCheckerWorker {
   constructor(
     private arRepository: IARRepository,
     private alertService: AlertService,
+    private changeStatusCommand: ChangeARStatusCommand,
     config: DateCheckerConfig = {}
   ) {
     this.prealertDays = config.prealertDays || 3;
@@ -75,6 +78,10 @@ export class DateCheckerWorker {
     today.setHours(0, 0, 0, 0);
 
     try {
+      // Update statuses FIRST (so alerts use correct status)
+      await this.updateOverdueStatus(today);
+
+      // Then check alerts
       await this.checkDueARs(today);
       await this.checkOverdueARs(today);
       await this.checkPreAlerts(today);
@@ -83,6 +90,33 @@ export class DateCheckerWorker {
     } catch (error) {
       console.error('Error in date checker:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Update AR status from PENDING to OVERDUE when due date passes
+   */
+  private async updateOverdueStatus(today: Date): Promise<void> {
+    // Find all PENDING ARs where due_date < today
+    const overdueARs = await this.arRepository.findOverdue(today);
+
+    console.log(`Updating status for ${overdueARs.length} overdue ARs`);
+
+    for (const ar of overdueARs) {
+      try {
+        // Emit STATUS_CHANGED event
+        await this.changeStatusCommand.execute({
+          ar_id: ar.ar_id,
+          new_status: ARStatus.OVERDUE,
+          reason: `Due date passed: ${ar.due_date.toISOString().split('T')[0]}`,
+          actor: { type: ActorType.SYSTEM }
+        });
+
+        console.log(`AR ${ar.ar_id} transitioned to OVERDUE`);
+      } catch (error) {
+        console.error(`Failed to update status for AR ${ar.ar_id}:`, error);
+        // Continue with other ARs even if one fails
+      }
     }
   }
 
@@ -134,6 +168,7 @@ export class DateCheckerWorker {
 
   /**
    * Check for overdue ARs and queue escalation alerts
+   * Only sends alert at exactly 7 days overdue (single warning)
    */
   private async checkOverdueARs(today: Date): Promise<void> {
     const overdueARs = await this.arRepository.findOverdue(today);
@@ -146,38 +181,47 @@ export class DateCheckerWorker {
         (today.getTime() - ar.due_date.getTime()) / (1000 * 60 * 60 * 24)
       );
 
-      // Queue escalation to manager
-      if (ar.manager_chat_id) {
-        await this.alertService.queueAlert({
-          ar_id: ar.ar_id,
-          alert_type: AlertType.OVERDUE,
-          target_type: TargetType.MANAGER,
-          delivery_chat_id: ar.manager_chat_id,
-          priority: 4,
-          message_template: `OVERDUE Alert: AR ${ar.ar_id} for ${ar.customer_name} is ${daysOverdue} days overdue (${ar.amount.value} ${ar.amount.currency})`,
-          message_data: {
+      // ONLY send alert at exactly 7 days overdue
+      if (daysOverdue === 7) {
+        // Alert to customer (if available)
+        if (ar.customer_chat_id) {
+          await this.alertService.queueAlert({
             ar_id: ar.ar_id,
-            customer_name: ar.customer_name,
-            amount: `${ar.amount.value} ${ar.amount.currency}`,
-            days_overdue: daysOverdue.toString(),
-          },
-        });
-      }
+            alert_type: AlertType.OVERDUE,
+            target_type: TargetType.CUSTOMER,
+            delivery_chat_id: ar.customer_chat_id,
+            priority: 4,
+            message_template: `Payment Overdue: Your payment of ${ar.amount.value} ${ar.amount.currency} is now ${daysOverdue} days overdue. Please settle immediately.`,
+            message_data: {
+              home_id: ar.home_id,
+              customer_name: ar.customer_name,
+              amount: `${ar.amount.value} ${ar.amount.currency}`,
+              due_date: ar.due_date.toISOString().split('T')[0],
+              days_overdue: daysOverdue.toString(),
+            },
+          });
+        }
 
-      // Also notify customer if significantly overdue (e.g., more than 7 days)
-      if (daysOverdue > 7 && ar.customer_chat_id) {
-        await this.alertService.queueAlert({
-          ar_id: ar.ar_id,
-          alert_type: AlertType.OVERDUE,
-          target_type: TargetType.CUSTOMER,
-          delivery_chat_id: ar.customer_chat_id,
-          priority: 4,
-          message_template: `Payment Overdue: Your payment of ${ar.amount.value} ${ar.amount.currency} is now ${daysOverdue} days overdue. Please settle immediately.`,
-          message_data: {
-            amount: `${ar.amount.value} ${ar.amount.currency}`,
-            days_overdue: daysOverdue.toString(),
-          },
-        });
+        // Alert to manager (if available)
+        if (ar.manager_chat_id) {
+          await this.alertService.queueAlert({
+            ar_id: ar.ar_id,
+            alert_type: AlertType.OVERDUE,
+            target_type: TargetType.MANAGER,
+            delivery_chat_id: ar.manager_chat_id,
+            priority: 4,
+            message_template: `OVERDUE Alert: AR ${ar.ar_id} for ${ar.customer_name} (${ar.home_id}) is ${daysOverdue} days overdue (${ar.amount.value} ${ar.amount.currency})`,
+            message_data: {
+              ar_id: ar.ar_id,
+              home_id: ar.home_id,
+              customer_name: ar.customer_name,
+              amount: `${ar.amount.value} ${ar.amount.currency}`,
+              days_overdue: daysOverdue.toString(),
+            },
+          });
+        }
+
+        console.log(`Queued 7-day overdue alert for AR ${ar.ar_id} (${daysOverdue} days overdue)`);
       }
     }
   }

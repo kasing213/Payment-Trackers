@@ -150,6 +150,35 @@ export class MongoARRepository implements IARRepository {
   }
 
   /**
+   * Update AR status (called after STATUS_CHANGED event)
+   */
+  async updateStatus(ar_id: string, new_status: ARStatus): Promise<void> {
+    await this.collection.updateOne(
+      { ar_id },
+      {
+        $set: { current_status: new_status },
+        $inc: { version: 1 }
+      }
+    );
+  }
+
+  /**
+   * Update AR payment info (called after PAYMENT_VERIFIED event)
+   */
+  async updatePayment(ar_id: string, _paid_amount: { value: number; currency: string }, payment_date: Date): Promise<void> {
+    await this.collection.updateOne(
+      { ar_id },
+      {
+        $set: {
+          current_status: ARStatus.PAID,
+          paid_date: payment_date
+        },
+        $inc: { version: 1 }
+      }
+    );
+  }
+
+  /**
    * Delete AR state (for testing/cleanup only)
    */
   async delete(ar_id: string): Promise<void> {

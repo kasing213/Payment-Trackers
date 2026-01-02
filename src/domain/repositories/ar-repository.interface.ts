@@ -88,6 +88,23 @@ export interface IARRepository {
   findAll(limit?: number, offset?: number): Promise<ARState[]>;
 
   /**
+   * Update AR status (called after STATUS_CHANGED event)
+   *
+   * @param ar_id - AR identifier
+   * @param new_status - New status to set
+   */
+  updateStatus(ar_id: string, new_status: ARStatus): Promise<void>;
+
+  /**
+   * Update AR payment info (called after PAYMENT_VERIFIED event)
+   *
+   * @param ar_id - AR identifier
+   * @param paid_amount - Amount paid
+   * @param payment_date - Date payment was received
+   */
+  updatePayment(ar_id: string, paid_amount: { value: number; currency: string }, payment_date: Date): Promise<void>;
+
+  /**
    * Delete AR state (use only for testing/cleanup)
    * NOT for normal operations (events are immutable)
    *

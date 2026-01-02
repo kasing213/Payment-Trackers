@@ -16,6 +16,8 @@ import { CreateARCommand } from './application/commands/create-ar.command';
 import { LogFollowUpCommand } from './application/commands/log-follow-up.command';
 import { VerifyPaymentCommand } from './application/commands/verify-payment.command';
 import { ChangeDueDateCommand } from './application/commands/change-due-date.command';
+import { ChangeARStatusCommand } from './application/commands/change-ar-status.command';
+import { CreateNextMonthARCommand } from './application/commands/create-next-month-ar.command';
 import { GetARStateQuery } from './application/queries/get-ar-state.query';
 import { GetPendingAlertsQuery } from './application/queries/get-pending-alerts.query';
 import { createServer } from './api/server';
@@ -84,8 +86,14 @@ class Application {
       // Initialize commands
       const createARCommand = new CreateARCommand(eventStore, arRepository);
       const logFollowUpCommand = new LogFollowUpCommand(eventStore, arRepository);
-      const verifyPaymentCommand = new VerifyPaymentCommand(eventStore, arRepository);
       const changeDueDateCommand = new ChangeDueDateCommand(eventStore, arRepository);
+      const changeARStatusCommand = new ChangeARStatusCommand(eventStore, arRepository);
+
+      // Create monthly billing command (depends on createARCommand)
+      const createNextMonthARCommand = new CreateNextMonthARCommand(arRepository, createARCommand);
+
+      // Verify payment command with monthly billing
+      const verifyPaymentCommand = new VerifyPaymentCommand(eventStore, arRepository, createNextMonthARCommand);
 
       // Initialize queries
       const getARStateQuery = new GetARStateQuery(arRepository);
@@ -127,10 +135,11 @@ class Application {
         console.error('Alert worker error:', error);
       });
 
-      // Date checker worker
+      // Date checker worker (with status change command)
       this.dateCheckerWorker = new DateCheckerWorker(
         arRepository,
         alertService,
+        changeARStatusCommand,
         { prealertDays: config.prealertDays }
       );
       this.dateCheckerWorker.start(config.dateCheckerCron);

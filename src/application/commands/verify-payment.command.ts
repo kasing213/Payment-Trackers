@@ -9,6 +9,7 @@ import { IARRepository } from '../../domain/repositories/ar-repository.interface
 import { PaymentVerifiedEvent } from '../../domain/events/ar-events';
 import { EventType, ActorType } from '../../domain/events/types';
 import { Money, ARStatus } from '../../domain/models/ar';
+import { CreateNextMonthARCommand } from './create-next-month-ar.command';
 
 /**
  * Verify Payment Data Transfer Object
@@ -27,7 +28,8 @@ export interface VerifyPaymentDTO {
 export class VerifyPaymentCommand {
   constructor(
     private eventStore: IEventStore,
-    private arRepository: IARRepository
+    private arRepository: IARRepository,
+    private createNextMonthAR: CreateNextMonthARCommand
   ) {}
 
   /**
@@ -86,6 +88,14 @@ export class VerifyPaymentCommand {
     await this.arRepository.save(ar);
 
     console.log(`Payment verified for AR ${dto.ar_id}: ${dto.paid_amount.value} ${dto.paid_amount.currency}`);
+
+    // Auto-create next month's AR (monthly billing)
+    try {
+      await this.createNextMonthAR.execute({ paid_ar_id: dto.ar_id });
+    } catch (error) {
+      console.error(`Failed to create next month AR for ${dto.ar_id}:`, error);
+      // Don't fail the payment verification if AR creation fails
+    }
   }
 
   /**
