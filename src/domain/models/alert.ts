@@ -54,6 +54,9 @@ export interface Alert {
   alert_id: string;
   ar_id: string; // Which AR triggered this alert
 
+  // Deduplication (prevents duplicate alerts)
+  dedup_key?: string; // Unique key for idempotency (e.g., "ar123_DUE_2025-01-15")
+
   // Classification
   alert_type: AlertType;
   target_type: TargetType;

@@ -50,6 +50,15 @@ export interface IAlertRepository {
   findPendingBySchedule(current_time: Date): Promise<Alert[]>;
 
   /**
+   * Find alert by deduplication key
+   * Used for idempotency to prevent duplicate alerts
+   *
+   * @param dedup_key - Deduplication key
+   * @returns Alert or null if not found
+   */
+  findByDedupKey(dedup_key: string): Promise<Alert | null>;
+
+  /**
    * Find alerts by status
    *
    * @param status - Alert status

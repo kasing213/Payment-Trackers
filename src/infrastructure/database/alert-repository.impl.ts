@@ -77,6 +77,15 @@ export class MongoAlertRepository implements IAlertRepository {
   }
 
   /**
+   * Find alert by deduplication key
+   * Used for idempotency to prevent duplicate alerts
+   */
+  async findByDedupKey(dedup_key: string): Promise<Alert | null> {
+    const doc = await this.collection.findOne({ dedup_key });
+    return doc ? this.mapDocumentToAlert(doc) : null;
+  }
+
+  /**
    * Find alerts by status
    */
   async findByStatus(status: AlertStatus): Promise<Alert[]> {
@@ -110,6 +119,7 @@ export class MongoAlertRepository implements IAlertRepository {
     return {
       alert_id: doc.alert_id,
       ar_id: doc.ar_id,
+      dedup_key: doc.dedup_key,
       alert_type: doc.alert_type,
       target_type: doc.target_type,
       priority: doc.priority,

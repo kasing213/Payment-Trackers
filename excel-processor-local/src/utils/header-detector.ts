@@ -10,7 +10,7 @@
  * Maps field names to column indices
  */
 export interface HeaderMapping {
-  customer_id?: number;     // Column index for "លេខ ផ្ទះ"
+  home_id?: number;         // Column index for "លេខ ផ្ទះ"
   customer_name?: number;   // Column index for "ឈ្មោះអតិថិជន"
   phone?: number;           // Column index for "លេខទូរសព្ទអតិថិជន"
   due_date?: number;        // Column index for "ថ្ងៃបង់ប្រាក់"
@@ -44,10 +44,13 @@ export interface HeaderDetectionConfig {
  * Each field has multiple variations to handle different spellings/spacing
  */
 const HEADER_PATTERNS: Record<string, string[]> = {
-  customer_id: [
+  home_id: [
     'លេខ ផ្ទះ',
     'លេខផ្ទះ',
     'ផ្ទះលេខ',
+    'home id',
+    'house id',
+    'home',
     'house code',
     'code',
     'id'

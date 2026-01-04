@@ -223,7 +223,7 @@ export class ExcelParserService {
       const row = sheetData[i] || [];
 
       // Extract fields using detected column indices
-      const customer_id = this.getCellValue(row, mapping.customer_id);
+      const home_id = this.getCellValue(row, mapping.home_id);
       const customer_name = this.getCellValue(row, mapping.customer_name);
       const phone = this.getCellValue(row, mapping.phone);
       const due_date_raw = this.getCellValue(row, mapping.due_date);
@@ -232,7 +232,7 @@ export class ExcelParserService {
       const notes = this.getCellValue(row, mapping.notes);
 
       // Check if row is blank (no customer ID and no customer name)
-      if (!customer_id && !customer_name) {
+      if (!home_id && !customer_name) {
         consecutiveBlankRows++;
         // Only stop after finding some valid rows (don't break too early)
         if (consecutiveBlankRows >= MAX_BLANK_ROWS && validRowsFound >= MIN_VALID_ROWS_BEFORE_STOPPING) {
@@ -270,18 +270,19 @@ export class ExcelParserService {
         : (amount_raw || '')) as string;
 
       const finalDateRaw = (due_date_parsed.success && due_date_parsed.value
-        ? due_date_parsed.value.toISOString().split('T')[0]
+        ? this.formatDate(due_date_parsed.value)
         : (due_date_raw || '')) as string;
 
       rows.push({
         row_index: i + 1,  // 1-indexed Excel row number
         sheet_name: sheetName,
+        home_id,
         customer_name,
         amount_raw: finalAmountRaw,
         date_raw: finalDateRaw,
         notes: notes || undefined,
         raw_data: {
-          customer_code: customer_id,
+          home_id,
           customer_name,
           phone,
           due_date: due_date_raw,
@@ -368,6 +369,16 @@ export class ExcelParserService {
     } catch {
       return { success: false };
     }
+  }
+
+  /**
+   * Format date as YYYY-MM-DD using local date parts (no timezone shift)
+   */
+  private formatDate(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   /**

@@ -59,10 +59,18 @@ export class RailwayAPIService {
    * @param reason - Reason for change
    */
   async changeDueDate(ar_id: string, new_due_date: Date, reason: string): Promise<void> {
-    await this.client.post(`/api/ar/${ar_id}/change-due-date`, {
-      new_due_date: new_due_date.toISOString(),
-      reason
-    });
+    try {
+      await this.client.post(`/api/ar/${ar_id}/change-due-date`, {
+        new_due_date: new_due_date.toISOString(),
+        reason
+      });
+    } catch (error: any) {
+      const status = error?.response?.status;
+      const data = error?.response?.data;
+      const details = status ? `status ${status}` : 'unknown status';
+      const body = data ? ` response=${JSON.stringify(data)}` : '';
+      throw new Error(`Railway changeDueDate failed (${details}).${body}`);
+    }
   }
 
   /**

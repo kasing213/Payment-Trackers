@@ -42,8 +42,6 @@ if [ ! -d node_modules ]; then
   npm install
 fi
 
-if [ ! -f dist/index.js ]; then
-  npm run build
-fi
+npm run build
 
 npm start

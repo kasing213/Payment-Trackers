@@ -140,7 +140,11 @@ class Application {
         arRepository,
         alertService,
         changeARStatusCommand,
-        { prealertDays: config.prealertDays }
+        createARCommand,
+        {
+          prealertDays: config.prealertDays,
+          futureArMonthsAhead: config.futureArMonthsAhead
+        }
       );
       this.dateCheckerWorker.start(config.dateCheckerCron);
 

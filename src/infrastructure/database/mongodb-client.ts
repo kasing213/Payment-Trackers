@@ -110,6 +110,8 @@ export class MongoDBClient {
       await alertQueueCollection.createIndex({ status: 1, scheduled_for: 1 });
       await alertQueueCollection.createIndex({ ar_id: 1, created_at: -1 });
       await alertQueueCollection.createIndex({ 'delivery_address.chat_id': 1 });
+      // Unique index on dedup_key for alert idempotency (sparse: allows null values)
+      await alertQueueCollection.createIndex({ dedup_key: 1 }, { unique: true, sparse: true });
 
       console.log('MongoDB: Indexes created successfully');
     } catch (error) {

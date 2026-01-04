@@ -5,6 +5,7 @@
  */
 
 import * as chokidar from 'chokidar';
+import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
@@ -221,7 +222,7 @@ export class ExcelProcessorWorker {
           if (!existing) {
             // New AR - create it via Railway API
             const result = await this.railwayApi.createAR({
-              home_id: row.customer_id,    // Rename: customer_id contains home ID (e.g., "B101")
+              home_id: row.home_id,
               zone: row.sheet_name || 'UNKNOWN',  // Zone from sheet name (e.g., "Sros")
               customer_name: row.customer_name,
               amount: row.amount,
@@ -240,6 +241,31 @@ export class ExcelProcessorWorker {
             console.log(`[Excel Processor] Row ${row.row_index}: New AR created for ${row.customer_name} (AR ID: ${result.ar_id})`);
 
           } else {
+            const existingZone = (existing.zone || '').trim();
+            const incomingZone = (row.sheet_name || '').trim();
+
+            if (existingZone && incomingZone && existingZone.toLowerCase() !== incomingZone.toLowerCase()) {
+              importLog.failed_rows++;
+              importLog.errors.push({
+                sheet_name: row.sheet_name,
+                row_index: row.row_index,
+                error_type: 'ZONE_CONFLICT',
+                error_message: `Zone mismatch for home_id ${row.home_id}: existing "${existing.zone}" vs incoming "${row.sheet_name}". Keeping existing zone.`,
+                raw_data: row
+              });
+
+              if (importLog.sheets_processed && row.sheet_name) {
+                const sheetStat = importLog.sheets_processed.find(s => s.sheet_name === row.sheet_name);
+                if (sheetStat) sheetStat.rows_failed++;
+              }
+
+              console.warn(
+                `[Excel Processor] Row ${row.row_index}: Zone conflict for home_id ${row.home_id} ` +
+                `(${existing.zone} vs ${row.sheet_name}), skipping`
+              );
+              continue;
+            }
+
             // Check if data changed
             const hasChanges = this.duplicateDetectionService.compareARData(existing, row);
 
@@ -304,12 +330,13 @@ export class ExcelProcessorWorker {
       const dateFolder = this.getDateFolder();
       const processedDir = path.join(this.processedFolder, dateFolder);
       await fs.mkdir(processedDir, { recursive: true });
+      const safeBaseName = this.buildSafeBaseName(fileName);
 
-      const processedPath = path.join(processedDir, `${path.parse(fileName).name}_${timestamp}.xlsx`);
+      const processedPath = path.join(processedDir, `${safeBaseName}_${timestamp}.xlsx`);
       await fs.rename(processingPath, processedPath);
 
       // Save summary file
-      const summaryPath = path.join(processedDir, `summary_${path.parse(fileName).name}_${timestamp}.json`);
+      const summaryPath = path.join(processedDir, `summary_${safeBaseName}_${timestamp}.json`);
       await fs.writeFile(summaryPath, JSON.stringify(importLog, null, 2));
 
       console.log(`[Excel Processor] Completed: ${fileName}`);
@@ -337,9 +364,10 @@ export class ExcelProcessorWorker {
         const dateFolder = this.getDateFolder();
         const failedDir = path.join(this.failedFolder, dateFolder);
         await fs.mkdir(failedDir, { recursive: true });
+        const safeBaseName = this.buildSafeBaseName(fileName);
 
         const processingPath = path.join(this.processingFolder, fileName);
-        const failedPath = path.join(failedDir, `${path.parse(fileName).name}_${timestamp}.xlsx`);
+        const failedPath = path.join(failedDir, `${safeBaseName}_${timestamp}.xlsx`);
 
         // Try to move from processing folder, if file still in upload folder, move from there
         try {
@@ -349,7 +377,7 @@ export class ExcelProcessorWorker {
         }
 
         // Save error file
-        const errorPath = path.join(failedDir, `error_${path.parse(fileName).name}_${timestamp}.json`);
+        const errorPath = path.join(failedDir, `error_${safeBaseName}_${timestamp}.json`);
         await fs.writeFile(errorPath, JSON.stringify(importLog, null, 2));
 
       } catch (moveError: any) {
@@ -387,6 +415,19 @@ export class ExcelProcessorWorker {
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  }
+
+  /**
+   * Build a short, ASCII-safe base name to avoid path length errors
+   */
+  private buildSafeBaseName(fileName: string): string {
+    const base = path.parse(fileName).name;
+    const slug = base
+      .replace(/[^a-zA-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 32) || 'import';
+    const hash = crypto.createHash('sha1').update(fileName).digest('hex').slice(0, 8);
+    return `${slug}_${hash}`;
   }
 
   /**

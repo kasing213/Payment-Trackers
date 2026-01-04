@@ -110,18 +110,49 @@ export class MongoARRepository implements IARRepository {
   }
 
   /**
+   * Find AR by home ID and due date
+   * Used for duplicate prevention in monthly AR auto-creation
+   */
+  async findByHomeIdAndDueDate(home_id: string, due_date: Date): Promise<ARState | null> {
+    const startOfDay = new Date(due_date);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(due_date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const doc = await this.collection.findOne({
+      home_id,
+      due_date: {
+        $gte: startOfDay,
+        $lte: endOfDay,
+      },
+    });
+
+    return doc ? this.mapDocumentToARState(doc) : null;
+  }
+
+  /**
    * Find overdue ARs
+   *
+   * Returns all PENDING ARs where due_date has passed
+   * - Uses $lt (less than) to find ARs due BEFORE today
+   * - Normalizes current_date to midnight for consistent date comparison
+   * - Only returns PENDING status (excludes already PAID or OVERDUE)
+   * - Sorted by due_date ascending (oldest overdue first)
    */
   async findOverdue(current_date: Date): Promise<ARState[]> {
+    // Normalize to midnight for consistent date-only comparison
     const today = new Date(current_date);
     today.setHours(0, 0, 0, 0);
 
     const docs = await this.collection
       .find({
         current_status: ARStatus.PENDING,
+        // $lt ensures we only get ARs where due_date < today (strictly before)
+        // e.g., if today is 2025-01-15, we get ARs due on 2025-01-14 or earlier
         due_date: { $lt: today },
       })
-      .sort({ due_date: 1 })
+      .sort({ due_date: 1 }) // Oldest overdue ARs first
       .toArray();
 
     return docs.map(this.mapDocumentToARState);

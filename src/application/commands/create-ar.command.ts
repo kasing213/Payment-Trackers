@@ -119,8 +119,12 @@ export class CreateARCommand {
       throw new Error('due_date is required');
     }
 
+    // Allow historical imports - system handles overdue ARs via DateChecker
     if (dto.due_date < dto.invoice_date) {
-      throw new Error('due_date cannot be before invoice_date');
+      console.warn(
+        `Creating AR with past due date: ${dto.due_date.toISOString().split('T')[0]} ` +
+        `(invoice: ${dto.invoice_date.toISOString().split('T')[0]}) for ${dto.home_id}`
+      );
     }
   }
 }

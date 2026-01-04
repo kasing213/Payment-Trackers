@@ -30,7 +30,9 @@ export class DuplicateDetectionService {
    */
   async detectDuplicate(row: NormalizedRowData): Promise<ARState | null> {
     // Find ARs for this home via Railway API
-    const homeARs = await this.railwayApi.getARsByHome(row.customer_id);  // customer_id field contains home_id
+    const homeARs = (await this.railwayApi.getARsByHome(row.home_id))
+      .map(ar => this.normalizeARState(ar))
+      .filter((ar): ar is ARState => ar !== null);
 
     if (homeARs.length === 0) {
       return null; // No existing ARs for this home
@@ -62,7 +64,7 @@ export class DuplicateDetectionService {
       ) {
         // Fuzzy match: same amount + date within 7 days
         console.warn(
-          `Fuzzy match detected for home ${row.customer_id}: ` +
+          `Fuzzy match detected for home ${row.home_id}: ` +
           `AR ${ar.ar_id} (${ar.invoice_date}) vs Excel row ${row.row_index} (${row.invoice_date})`
         );
         return ar;
@@ -89,7 +91,7 @@ export class DuplicateDetectionService {
     }
 
     // Compare due_date (as timestamps)
-    if (existing.due_date.getTime() !== newData.due_date.getTime()) {
+    if (this.dateKey(existing.due_date) !== this.dateKey(newData.due_date)) {
       return true; // Due date changed
     }
 
@@ -133,11 +135,10 @@ export class DuplicateDetectionService {
     }
 
     // Check due date change
-    if (existing.due_date.getTime() !== newData.due_date.getTime()) {
+    if (this.dateKey(existing.due_date) !== this.dateKey(newData.due_date)) {
       due_date_changed = true;
       changes.push(
-        `Due Date: ${existing.due_date.toISOString().split('T')[0]} → ` +
-        `${newData.due_date.toISOString().split('T')[0]}`
+        `Due Date: ${this.dateKey(existing.due_date)} → ${this.dateKey(newData.due_date)}`
       );
     }
 
@@ -166,5 +167,51 @@ export class DuplicateDetectionService {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     return `${year}-${month}`;
+  }
+
+  /**
+   * Normalize date to YYYY-MM-DD using local date parts
+   */
+  private dateKey(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  /**
+   * Normalize date fields from API responses
+   */
+  private normalizeARState(ar: any): ARState | null {
+    const invoice_date = this.toDate(ar.invoice_date);
+    const due_date = this.toDate(ar.due_date);
+
+    if (!invoice_date || !due_date) {
+      return null;
+    }
+
+    return {
+      ...ar,
+      invoice_date,
+      due_date
+    };
+  }
+
+  /**
+   * Parse API date values into Date objects
+   */
+  private toDate(value: unknown): Date | null {
+    if (!value) return null;
+
+    if (value instanceof Date) {
+      return isNaN(value.getTime()) ? null : value;
+    }
+
+    if (typeof value === 'string' || typeof value === 'number') {
+      const parsed = new Date(value);
+      return isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    return null;
   }
 }

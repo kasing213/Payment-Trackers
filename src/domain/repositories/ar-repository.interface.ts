@@ -62,6 +62,16 @@ export interface IARRepository {
   findByDueDateAndStatus(due_date: Date, status: ARStatus): Promise<ARState[]>;
 
   /**
+   * Find AR by home ID and due date
+   * Used for duplicate prevention in monthly AR auto-creation
+   *
+   * @param home_id - Home/meter identifier
+   * @param due_date - Due date to match
+   * @returns AR state or null if not found
+   */
+  findByHomeIdAndDueDate(home_id: string, due_date: Date): Promise<ARState | null>;
+
+  /**
    * Find overdue ARs
    * Returns ARs where due_date < current date and status is PENDING
    *

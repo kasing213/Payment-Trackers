@@ -30,6 +30,7 @@ export interface AppConfig {
   // Date Checker
   dateCheckerCron: string;
   prealertDays: number;
+  futureArMonthsAhead: number;
 
   // API Authentication (Railway deployment)
   apiKey: string;
@@ -61,6 +62,7 @@ export function loadConfig(): AppConfig {
     // Date Checker
     dateCheckerCron: process.env.DATE_CHECKER_CRON || '0 9 * * *', // 9 AM daily
     prealertDays: parseInt(process.env.PREALERT_DAYS || '3', 10),
+    futureArMonthsAhead: parseInt(process.env.FUTURE_AR_MONTHS_AHEAD || '6', 10),
 
     // API Authentication
     apiKey: process.env.API_KEY || '',
@@ -92,6 +94,10 @@ function validateConfig(config: AppConfig): void {
 
   if (config.port < 1 || config.port > 65535) {
     errors.push('PORT must be between 1 and 65535');
+  }
+
+  if (config.futureArMonthsAhead < 0 || config.futureArMonthsAhead > 24) {
+    errors.push('FUTURE_AR_MONTHS_AHEAD must be between 0 and 24');
   }
 
   // OpenAI and Excel validation removed - handled by local processor

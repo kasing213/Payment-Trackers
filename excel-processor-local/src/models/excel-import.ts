@@ -8,6 +8,7 @@
 export interface ExcelRowData {
   row_index: number;
   sheet_name: string;         // NEW: Which sheet this row came from
+  home_id?: string;           // House/meter ID (e.g., "B101")
   customer_name: string;
   amount_raw: string;        // e.g., "150,000 KHR" or "$5,000"
   date_raw: string;           // e.g., "31/12/2025"
@@ -25,7 +26,7 @@ export interface ExcelRowData {
 export interface NormalizedRowData {
   row_index: number;
   sheet_name?: string;        // NEW: Preserve sheet name through processing
-  customer_id: string;
+  home_id: string;
   customer_name: string;
   amount: { value: number; currency: string };
   invoice_date: Date;
@@ -85,7 +86,7 @@ export interface GPTProcessingRequest {
 export interface GPTProcessingResponse {
   normalized_rows: Array<{
     row_index: number;
-    customer_id: string;
+    home_id: string;
     customer_name: string;
     amount: { value: number; currency: string };
     invoice_date: string;  // YYYY-MM-DD format

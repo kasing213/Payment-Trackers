@@ -91,7 +91,10 @@ export class VerifyPaymentCommand {
 
     // Auto-create next month's AR (monthly billing)
     try {
-      await this.createNextMonthAR.execute({ paid_ar_id: dto.ar_id });
+      await this.createNextMonthAR.execute({
+        paid_ar_id: dto.ar_id,
+        payment_date: dto.payment_date
+      });
     } catch (error) {
       console.error(`Failed to create next month AR for ${dto.ar_id}:`, error);
       // Don't fail the payment verification if AR creation fails

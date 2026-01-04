@@ -24,6 +24,7 @@ export interface QueueAlertParams {
   message_template: string;
   message_data: Record<string, any>;
   triggered_by_event_id?: string;
+  dedup_key?: string; // For idempotency (prevents duplicate alerts)
 }
 
 /**
@@ -42,6 +43,17 @@ export class AlertService {
    * @returns alert_id of the queued alert
    */
   async queueAlert(params: QueueAlertParams): Promise<string> {
+    // Check for duplicate using dedup_key (idempotency)
+    if (params.dedup_key) {
+      const existingAlert = await this.alertRepository.findByDedupKey(params.dedup_key);
+      if (existingAlert) {
+        console.log(
+          `Alert already exists with dedup_key ${params.dedup_key}, skipping (alert_id: ${existingAlert.alert_id})`
+        );
+        return existingAlert.alert_id;
+      }
+    }
+
     const alert_id = uuidv4();
     const event_id = uuidv4();
 
@@ -54,6 +66,7 @@ export class AlertService {
     const alert: Alert = {
       alert_id,
       ar_id: params.ar_id,
+      dedup_key: params.dedup_key,
       alert_type: params.alert_type,
       target_type: params.target_type,
       priority,
